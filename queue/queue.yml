@@ -1,0 +1,5 @@
+queue: "test1"
+etcd: "localhost:2379"
+addr: "0.0.0.0:2080"
+log-level: "debug"
+client-limit: 10
