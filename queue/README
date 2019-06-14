@@ -1,7 +1,7 @@
 etcd games: work queue
 
 * terms
-task: 
+task:
   ID:    unix time with nanoseconds
   Value: arbitraty string
 state: some value to allow atomic updates only (must provide old and new in put call to use one)
@@ -40,3 +40,5 @@ etcdctl get __ --from-key=true
 * todo
 zap loggger ? (etcd client use one)
 client go api
+namespace prefix
+http post
