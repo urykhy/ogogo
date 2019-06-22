@@ -1,0 +1,1 @@
+call handler for every task in slice and exit on first error

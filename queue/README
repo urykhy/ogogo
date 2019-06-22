@@ -19,7 +19,7 @@ curl "localhost:2080/state"
 * dump queue state
 curl "localhost:2080/dump"
 
-* get tesk
+* get task
 curl "localhost:2080/get?client=123&timeout=10"
 >> {"ID":"1559988339875756912","Value":"12347"}
 
