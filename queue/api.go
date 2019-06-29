@@ -23,7 +23,7 @@ import (
 // CreateRouter creates swagger api router
 func CreateRouter(log *log.Logger) *mux.Router {
 	r := mux.NewRouter()
-	r.Path("/api/v1/dump").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Path("/api/v1/dump").Methods("get").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// dump all tasks in queue
 		code, resp, err := dump()
 		if err != nil {
@@ -45,7 +45,7 @@ func CreateRouter(log *log.Logger) *mux.Router {
 		w.WriteHeader(code)
 	})
 
-	r.Path("/api/v1/get").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Path("/api/v1/get").Methods("get").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// get next task from queue
 		q := r.URL.Query()
 		var ClientID *string
@@ -97,7 +97,7 @@ func CreateRouter(log *log.Logger) *mux.Router {
 		w.WriteHeader(code)
 	})
 
-	r.Path("/api/v1/renew").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Path("/api/v1/renew").Methods("get").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// refresh lease on task
 		q := r.URL.Query()
 		var ClientID *string
@@ -133,7 +133,7 @@ func CreateRouter(log *log.Logger) *mux.Router {
 		w.WriteHeader(code)
 	})
 
-	r.Path("/api/v1/ack").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Path("/api/v1/ack").Methods("get").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// mark task as done
 		q := r.URL.Query()
 		var ClientID *string
@@ -169,7 +169,7 @@ func CreateRouter(log *log.Logger) *mux.Router {
 		w.WriteHeader(code)
 	})
 
-	r.Path("/api/v1/put").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Path("/api/v1/put").Methods("get").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// add task to queue
 		q := r.URL.Query()
 		var Data *string
@@ -209,7 +209,7 @@ func CreateRouter(log *log.Logger) *mux.Router {
 		w.WriteHeader(code)
 	})
 
-	r.Path("/api/v1/state").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	r.Path("/api/v1/state").Methods("get").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// get task state cookie
 		code, resp, err := getState()
 		if err != nil {

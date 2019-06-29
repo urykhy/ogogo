@@ -130,6 +130,6 @@ paths:
           schema:
             type: object
             properties:
-              status:
+              state:
                 type: string
                 description: currect state

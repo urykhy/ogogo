@@ -32,7 +32,7 @@ print ("r := mux.NewRouter()")
 for fname in doc["paths"]:
     for method in doc["paths"][fname]:
         d = doc["paths"][fname][method]
-        print ("r.Path(\"{}\").HandlerFunc(func (w http.ResponseWriter, r *http.Request)".format(doc["basePath"] + fname),"{")
+        print ("r.Path(\"{}\").Methods(\"{}\").HandlerFunc(func (w http.ResponseWriter, r *http.Request)".format(doc["basePath"] + fname, method),"{")
         print ("// {}".format(d["summary"]))
         params = []
         if "parameters" in d:
@@ -93,4 +93,3 @@ for fname in doc["paths"]:
     print ("")
 print ("return r")
 print ("}")
-# func handleDump(w http.ResponseWriter, r *http.Request)
