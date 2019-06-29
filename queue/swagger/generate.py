@@ -2,6 +2,12 @@
 
 import yaml
 
+def withResponse(resp):
+    for x in resp:
+        if "schema" in resp[x]:
+            return True
+    return False
+
 filename="urykhy1-queue-1.0.0-swagger.yaml"
 with open(filename, 'r') as stream:
     doc = yaml.safe_load(stream)
@@ -53,7 +59,26 @@ for fname in doc["paths"]:
                 print ("}")
                 print ("}")
                 params.append("&{}".format(name))
-        print ("{}({})".format(d["operationId"], ",".join(params)))
+
+        if "responses" in d and withResponse(d["responses"]):
+            wr = True
+            print ("code, resp, err := {}({})".format(d["operationId"], ",".join(params)))
+        else:
+            wr = False
+            print ("code, err := {}({})".format(d["operationId"], ",".join(params)))
+        print ("if err != nil {")
+        print ("w.WriteHeader(http.StatusInternalServerError)")
+        print ("return")
+        print ("}")
+        if wr:
+            print ("jresp, err := json.Marshal(resp)")
+            print ("if err != nil {")
+            print ("log.WithField(\"method\", \"{}\").Error(\"fail to format result\")".format(fname))
+            print ("w.WriteHeader(http.StatusInternalServerError)")
+            print ("return")
+            print ("}")
+            print ("w.Write(jresp)")
+        print ("w.WriteHeader(code)")
         print ("})")
     print ("")
 print ("return r")
