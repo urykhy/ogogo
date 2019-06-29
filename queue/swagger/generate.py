@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import yaml
 
 def withResponse(resp):
@@ -36,17 +37,33 @@ for fname in doc["paths"]:
         print ("// {}".format(d["summary"]))
         params = []
         if "parameters" in d:
-            print ("q := r.URL.Query()")
+            if method == "get":
+                print ("q := r.URL.Query()")
+                checkQuery = "q"
+                getQuery = "q.Get"
+            else:
+                print ("if err := r.ParseForm(); err != nil {")
+                print ("log.WithField(\"method\", \"{}\").Warn(\"bad form: \", err)".format(fname))
+                print ("w.WriteHeader(http.StatusBadRequest)")
+                print ("return")
+                print ("}")
+                checkQuery = "r.Form"
+                getQuery = "r.FormValue"
+
             for param in d["parameters"]:
                 #print (param)
+                if param["in"] != "query":
+                    sys.stderr.write("only in 'query' parameters are supported")
+                    sys.exit(-1)
                 name = ''.join(x for x in param["name"].title() if not x == "_")
                 name = name.replace("Id","ID")
                 print ("var {} *{}".format(name, "int64" if param["type"] == "integer" else "string"))
                 print ("{")
-                print ("_, ok := q[\"{}\"]".format(param["name"]))
+
+                print ("_, ok := {}[\"{}\"]".format(checkQuery, param["name"]))
                 print ("if ok {")
                 if param["type"] == "integer":
-                    print ("{}Tmp, err := strconv.ParseInt(q.Get(\"{}\"), 10, 64)".format(name, param["name"]))
+                    print ("{}Tmp, err := strconv.ParseInt({}(\"{}\"), 10, 64)".format(name, getQuery, param["name"]))
                     print ("if err != nil {")
                     print ("log.WithField(\"method\", \"{}\").Warn(\"bad param {}\")".format(fname, param["name"]))
                     print ("w.WriteHeader(http.StatusBadRequest)")
@@ -54,7 +71,7 @@ for fname in doc["paths"]:
                     print ("}")
                     print ("{0} = &{0}Tmp".format(name))
                 else:
-                    print ("{}Tmp := q.Get(\"{}\")".format(name, param["name"]))
+                    print ("{}Tmp := {}(\"{}\")".format(name, getQuery, param["name"]))
                     print ("{0} = &{0}Tmp".format(name))
                 if "required" in param and param["required"] == True:
                     print ("} else {")

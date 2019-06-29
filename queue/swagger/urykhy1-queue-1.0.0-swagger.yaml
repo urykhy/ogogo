@@ -100,7 +100,7 @@ paths:
     get:
       summary: add task to queue
       operationId: putTask
-      parameters: 
+      parameters:
       - in: query
         name: data
         type: string
@@ -117,7 +117,29 @@ paths:
       responses:
         '200':
           description: OK
-        '409': 
+        '409':
+          description: Conflict
+    post:
+      summary: add task to queue
+      operationId: putTask
+      parameters:
+      - in: query
+        name: data
+        type: string
+        required: true
+        description: user data assotiated with task (filename and so on)
+      - in: query
+        name: old
+        type: string
+        description: old state, used to add new task in CAS manner
+      - in: query
+        name: state
+        type: string
+        description: new state, add task only if `old` matches current state 
+      responses:
+        '200':
+          description: OK
+        '409':
           description: Conflict
           
   /state:

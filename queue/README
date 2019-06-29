@@ -8,6 +8,7 @@ state: some value to allow atomic updates only (must provide old and new in put 
 
 * add task without state:
 curl "localhost:2080/api/v1/put?data=12345"
+curl -v -X POST -d data=post123 "localhost:2080/api/v1/put"
 
 * add task with state (initial state is "", add only if old states matches)
 curl -v "localhost:2080/api/v1/put?data=12350&old=&state=A"
@@ -41,7 +42,6 @@ etcdctl get __ --from-key=true
 zap loggger ? (etcd client use one)
 client go api
 namespace prefix
-http post
 nak request to release task
 drop client limit
 

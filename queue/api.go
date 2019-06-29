@@ -208,6 +208,49 @@ func CreateRouter(log *log.Logger) *mux.Router {
 		}
 		w.WriteHeader(code)
 	})
+	r.Path("/api/v1/put").Methods("post").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// add task to queue
+		if err := r.ParseForm(); err != nil {
+			log.WithField("method", "/put").Warn("bad form: ", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var Data *string
+		{
+			_, ok := r.Form["data"]
+			if ok {
+				DataTmp := r.FormValue("data")
+				Data = &DataTmp
+			} else {
+				log.WithField("method", "/put").Warn("no required param data")
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+		var Old *string
+		{
+			_, ok := r.Form["old"]
+			if ok {
+				OldTmp := r.FormValue("old")
+				Old = &OldTmp
+			}
+		}
+		var State *string
+		{
+			_, ok := r.Form["state"]
+			if ok {
+				StateTmp := r.FormValue("state")
+				State = &StateTmp
+			}
+		}
+		code, err := putTask(Data, Old, State)
+		if err != nil {
+			w.WriteHeader(code)
+			log.WithField("method", "/put").Error(err)
+			return
+		}
+		w.WriteHeader(code)
+	})
 
 	r.Path("/api/v1/state").Methods("get").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// get task state cookie
