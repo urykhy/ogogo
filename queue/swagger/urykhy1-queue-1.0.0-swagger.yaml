@@ -11,7 +11,7 @@ paths:
   /dump:
     get:
       summary: dump all tasks in queue
-      operationId: Dump
+      operationId: dump
       responses:
         '200':
           description: OK
@@ -30,7 +30,7 @@ paths:
   /get:
     get:
       summary: get next task from queue
-      operationId: GetTask
+      operationId: getTask
       parameters:
       - in: query
         name: client_id
@@ -59,7 +59,7 @@ paths:
   /renew:
     get:
       summary: refresh lease on task
-      operationId: RenewTask
+      operationId: renewTask
       parameters: 
       - in: query
         name: client_id
@@ -80,7 +80,7 @@ paths:
   /ack:
     get:
       summary: mark task as done
-      operationId: AckTask
+      operationId: ackTask
       parameters: 
       - in: query
         name: client_id
@@ -99,7 +99,7 @@ paths:
   /put:
     get:
       summary: add task to queue
-      operationId: PutTask
+      operationId: putTask
       parameters: 
       - in: query
         name: data
@@ -123,7 +123,7 @@ paths:
   /state:
     get:
       summary: get task state cookie
-      operationId: GetState
+      operationId: getState
       responses:
         '200':
           description: OK

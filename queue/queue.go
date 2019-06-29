@@ -2,19 +2,18 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"go.etcd.io/etcd/clientv3"
 )
 
 var client *clientv3.Client
 
-const timeout = time.Second * 5
+const etcdTimeout = time.Second * 5
 
 func stateKey() string {
 	return "__internal:" + cfg.Queue
@@ -27,7 +26,7 @@ func activeKey(task string) string {
 func openEtcd() error {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   []string{cfg.Etcd},
-		DialTimeout: timeout,
+		DialTimeout: etcdTimeout,
 	})
 	if err != nil {
 		return err
@@ -36,7 +35,7 @@ func openEtcd() error {
 
 	// FIXME: wrap with retry ?
 	// create queue state if not exists
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 	_, err = client.Txn(ctx).
 		If(clientv3.Compare(clientv3.CreateRevision(stateKey()), "=", 0)).
 		Then(clientv3.OpPut(stateKey(), "")).
@@ -49,87 +48,69 @@ func openEtcd() error {
 	return nil
 }
 
-type kv struct {
+// KV XXX
+type KV struct {
 	ID    string
 	Value string
 }
 
-func handleDump(w http.ResponseWriter, r *http.Request) {
+// State XXX
+type State struct {
+	State string
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+func dump() (int, *[]KV, error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 	resp, err := client.Get(ctx, cfg.Queue, clientv3.WithPrefix(), clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend))
 	cancel()
 	if err != nil {
-		logger.WithError(err).Warnf("fail dump queue")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, nil, err
 	}
 
 	prefixLen := len(cfg.Queue) + 1 // to skip `:`
-	result := make([]kv, 0, len(resp.Kvs))
+	result := make([]KV, 0, len(resp.Kvs))
 	for _, ev := range resp.Kvs {
-		t := kv{ID: string(ev.Key)[prefixLen:], Value: string(ev.Value)}
+		t := KV{ID: string(ev.Key)[prefixLen:], Value: string(ev.Value)}
 		result = append(result, t)
 	}
-
-	jsonString, err := json.Marshal(result)
-	if err != nil {
-		logger.WithError(err).Warnf("fail to format dump")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonString)
+	return http.StatusOK, &result, nil
 }
 
-func handleGet(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	clientID := q.Get("client")
-	leaseTime, err := strconv.ParseInt(q.Get("timeout"), 10, 64)
-	if err != nil {
-		logger.WithError(err).Warnf("bad timeout")
-		w.WriteHeader(http.StatusBadRequest)
-	}
+func getTask(clientID *string, timeout *int64) (int, *KV, error) {
 	f := log.Fields{"client": clientID}
 
 	// fetch all running tasks
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 	resp, err := client.Get(ctx, "__active:"+cfg.Queue+":", clientv3.WithPrefix(), clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend))
 	cancel()
 	if err != nil {
-		logger.WithError(err).Warnf("fail to get running tasks")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, nil, err
 	}
 
 	// ensure client have no running task
 	prefixLen := len("__active:" + cfg.Queue + ":") // task id right after prefix
 	running := make(map[string]struct{})
 	for _, ev := range resp.Kvs {
-		if string(ev.Value) == clientID {
-			logger.WithFields(f).Warnf("client already have a task %s", ev)
-			w.WriteHeader(http.StatusConflict)
-			return
+		if string(ev.Value) == *clientID {
+			return http.StatusConflict, nil, fmt.Errorf("client already have a task %s", ev)
 		}
 		runningTaskID := string(ev.Key)[prefixLen:]
 		running[runningTaskID] = struct{}{}
 	}
 
 	// get pending tasks
-	ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	ctx, cancel = context.WithTimeout(context.Background(), etcdTimeout)
 	all, err := client.Get(ctx, cfg.Queue+":", clientv3.WithPrefix(), clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend), clientv3.WithLimit(cfg.Limit))
 	cancel()
 	if err != nil {
-		logger.WithError(err).Warnf("fail to get tasks")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, nil, fmt.Errorf("fail to get tasks")
 	}
 
 	prefixLen = len(cfg.Queue) + 1 // to skip `:`
-	var pending kv
+	var pending KV
 	for _, ev := range all.Kvs {
-		t := kv{ID: string(ev.Key)[prefixLen:], Value: string(ev.Value)}
+		t := KV{ID: string(ev.Key)[prefixLen:], Value: string(ev.Value)}
 		_, ok := running[t.ID]
 		if !ok && len(pending.ID) == 0 {
 			pending = t // pick first not running task
@@ -137,184 +118,121 @@ func handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(pending.ID) == 0 {
-		logger.WithFields(f).Debug("no tasks available")
-		w.WriteHeader(http.StatusNoContent)
-		return
+		return http.StatusNoContent, nil, nil
 	}
 	f = log.Fields{"client": clientID, "task": pending.ID, "value": pending.Value}
 
 	// create lease
-	lease, err := client.Grant(context.TODO(), leaseTime)
+	lease, err := client.Grant(context.TODO(), *timeout)
 	if err != nil {
-		logger.WithError(err).Warnf("fail to create a lease")
-		w.WriteHeader(http.StatusInternalServerError)
+		return http.StatusInternalServerError, nil, fmt.Errorf("fail to create a lease")
 	}
 
 	// put with Lease in txn
-	ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	ctx, cancel = context.WithTimeout(context.Background(), etcdTimeout)
 	putResp, err := client.Txn(ctx).
 		If(clientv3.Compare(clientv3.CreateRevision(activeKey(pending.ID)), "=", 0)).
-		Then(clientv3.OpPut(activeKey(pending.ID), clientID, clientv3.WithLease(lease.ID))).
+		Then(clientv3.OpPut(activeKey(pending.ID), *clientID, clientv3.WithLease(lease.ID))).
 		Commit()
 	cancel()
 	if err != nil {
-		logger.WithError(err).Warnf("fail to get lease on task %s", pending.ID)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, nil, fmt.Errorf("fail to get lease on task %s", pending.ID)
 	}
 	if !putResp.Succeeded {
-		logger.WithFields(f).Debug("conflict")
-		w.WriteHeader(http.StatusConflict)
-		return
+		return http.StatusConflict, nil, nil
 	}
-
-	// return task id and data to user
-	jsonString, err := json.Marshal(pending)
-	if err != nil {
-		logger.WithError(err).Warnf("fail to format reply")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	logger.WithFields(f).Debug("got a task")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonString)
+	return http.StatusOK, &pending, nil
 }
 
-func handleRenew(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	clientID := q.Get("client")
-	taskID := q.Get("task")
-	f := log.Fields{"client": clientID, "task": taskID}
+func renewTask(clientID *string, taskID *string) (int, error) {
+	f := log.Fields{"client": *clientID, "task": *taskID}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	resp, err := client.Get(ctx, activeKey(taskID))
+	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+	resp, err := client.Get(ctx, activeKey(*taskID))
 	cancel()
 	if err != nil {
-		logger.WithError(err).Warnf("fail to get running tasks")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, fmt.Errorf("fail to get running tasks")
 	}
 
 	renewOk := false
 	for _, ev := range resp.Kvs {
-		if string(ev.Value) != clientID {
-			logger.WithFields(f).Warnf("client do not own this task")
-			w.WriteHeader(http.StatusConflict)
-			return
+		if string(ev.Value) != *clientID {
+			return http.StatusConflict, fmt.Errorf("client do not own this task")
 		}
 		_, err = client.KeepAliveOnce(context.Background(), clientv3.LeaseID(ev.Lease))
 		if err != nil {
-			logger.WithFields(f).Warnf("fail to refresh")
-			w.WriteHeader(http.StatusInternalServerError)
-		} else {
-			renewOk = true
+			return http.StatusInternalServerError, fmt.Errorf("fail to refresh")
 		}
+		renewOk = true
 	}
 	if renewOk {
 		logger.WithFields(f).Debugf("refresh ok")
-		w.WriteHeader(http.StatusOK)
-	} else {
-		logger.WithFields(f).Warn("no task to refresh")
-		w.WriteHeader(http.StatusNotFound)
+		return http.StatusOK, nil
 	}
+	return http.StatusNotFound, fmt.Errorf("no task to refresh")
 }
 
-func handleAck(w http.ResponseWriter, r *http.Request) {
+func ackTask(clientID *string, taskID *string) (int, error) {
 	var err error
-	q := r.URL.Query()
-	clientID := q.Get("client")
-	taskID := q.Get("task")
-	f := log.Fields{"client": clientID, "task": taskID}
+	f := log.Fields{"client": *clientID, "task": *taskID}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 	var resp *clientv3.TxnResponse
 	resp, err = client.Txn(ctx).
-		If(clientv3.Compare(clientv3.Value(activeKey(taskID)), "=", clientID)).
-		Then(clientv3.OpDelete(activeKey(taskID)),
-			clientv3.OpDelete(cfg.Queue+":"+taskID)).
+		If(clientv3.Compare(clientv3.Value(activeKey(*taskID)), "=", *clientID)).
+		Then(clientv3.OpDelete(activeKey(*taskID)),
+			clientv3.OpDelete(cfg.Queue+":"+*taskID)).
 		Commit()
 	cancel()
 	if err != nil {
-		logger.WithError(err).Warnf("fail to ack task %s", taskID)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, fmt.Errorf("fail to ack task %v", *taskID)
 	}
 	if !resp.Succeeded {
-		logger.WithFields(f).Debug("task not running")
-		w.WriteHeader(http.StatusNotFound) // FIXME ???
-		return
+		return http.StatusNotFound, fmt.Errorf("task %v not running", *taskID)
 	}
 
-	logger.WithFields(f).Debug("task complited")
-	w.WriteHeader(http.StatusOK)
+	logger.WithFields(f).Debug("task completed")
+	return http.StatusOK, nil
 }
 
-func handlePut(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	taskValue := q.Get("task")
-	old := q.Get("old")
-	state := q.Get("state")
-
-	if len(taskValue) < 1 {
-		logger.Warn("bad task in request")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
+func putTask(data *string, old *string, state *string) (int, error) {
 	var err error
 	dataKey := cfg.Queue + ":" + fmt.Sprintf("%v", time.Now().UnixNano())
-	if len(state) < 1 {
+	if state == nil {
 		logger.Debug("no cas, just add a task")
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		_, err = client.Put(ctx, dataKey, taskValue)
+		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
+		_, err = client.Put(ctx, dataKey, *data)
 		cancel()
 		if err != nil {
-			logger.WithError(err).Warnf("fail to add task %s", taskValue)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+			return http.StatusInternalServerError, errors.Wrap(err, "fail to add task")
 		}
 	} else {
 		logger.Debug("with cas, start transaction")
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 		var resp *clientv3.TxnResponse
 		resp, err = client.Txn(ctx).
-			If(clientv3.Compare(clientv3.Value(stateKey()), "=", old)).
-			Then(clientv3.OpPut(stateKey(), state), clientv3.OpPut(dataKey, taskValue)).
+			If(clientv3.Compare(clientv3.Value(stateKey()), "=", *old)).
+			Then(clientv3.OpPut(stateKey(), *state), clientv3.OpPut(dataKey, *data)).
 			Commit()
 		cancel()
 		if err != nil {
-			logger.WithError(err).Warnf("fail to add task %s", taskValue)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+			return http.StatusInternalServerError, errors.Wrap(err, "fail to add task")
 		}
 		if !resp.Succeeded {
-			logger.WithField("task-value", taskValue).Warn("conflict")
-			w.WriteHeader(http.StatusConflict)
-			return
+			return http.StatusConflict, errors.Wrap(err, "fail to add task")
 		}
 	}
-
-	w.WriteHeader(http.StatusOK)
+	return http.StatusOK, nil
 }
 
-func handleState(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+func getState() (int, *State, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), etcdTimeout)
 	resp, err := client.Get(ctx, stateKey())
 	cancel()
 	if err != nil {
-		logger.WithError(err).Warnf("fail to get state")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, nil, errors.Wrap(err, "fail to get state")
 	}
 
-	jsonString, err := json.Marshal(struct{ State string }{string(resp.Kvs[0].Value)})
-	if err != nil {
-		logger.WithError(err).Warnf("fail to format state")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonString)
+	return http.StatusOK, &State{string(resp.Kvs[0].Value)}, nil
 }

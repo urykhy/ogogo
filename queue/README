@@ -7,27 +7,27 @@ task:
 state: some value to allow atomic updates only (must provide old and new in put call to use one)
 
 * add task without state:
-curl "localhost:2080/put?task=12345"
+curl "localhost:2080/api/v1/put?data=12345"
 
 * add task with state (initial state is "", add only if old states matches)
-curl -v "localhost:2080/put?task=12350&old=&state=A"
-curl -v "localhost:2080/put?task=12351&old=A&state=B"
+curl -v "localhost:2080/api/v1/put?data=12350&old=&state=A"
+curl -v "localhost:2080/api/v1/put?data=12351&old=A&state=B"
 
 * get current state
-curl "localhost:2080/state"
+curl "localhost:2080/api/v1/state"
 
 * dump queue state
-curl "localhost:2080/dump"
+curl "localhost:2080/api/v1/dump"
 
 * get task
-curl "localhost:2080/get?client=123&timeout=10"
+curl "localhost:2080/api/v1/get?client_id=123&timeout=10"
 >> {"ID":"1559988339875756912","Value":"12347"}
 
 * renew task
-curl "localhost:2080/renew?client=123&task=1559988339875756912"
+curl "localhost:2080/api/v1/renew?client_id=123&task_id=1559988339875756912"
 
 * finish task
-curl "localhost:2080/ack?client=123&task=1559988339875756912"
+curl "localhost:2080/api/v1/ack?client_id=123&task_id=1559988339875756912"
 
 * etcd format:
 queue:  <queue-name>:<unixtime> -> data
@@ -44,3 +44,7 @@ namespace prefix
 http post
 nak request to release task
 drop client limit
+
+* regenerate api
+cd swagger:
+./generate.py > ../api.go

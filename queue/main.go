@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
@@ -69,14 +68,7 @@ func main() {
 		logger.Fatalf("cant create connection to etcd: %v", err)
 	}
 
-	r := mux.NewRouter()
-	r.Path("/dump").HandlerFunc(handleDump)
-	r.Path("/get").HandlerFunc(handleGet)
-	r.Path("/renew").HandlerFunc(handleRenew)
-	r.Path("/ack").HandlerFunc(handleAck)
-	r.Path("/put").Queries("task", "{[0-9]?}").HandlerFunc(handlePut)
-	r.Path("/state").HandlerFunc(handleState)
-
+	r := CreateRouter(logger)
 	logger.Infof("start api at %v", cfg.Addr)
 	server := &http.Server{
 		Addr:         cfg.Addr,
