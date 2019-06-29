@@ -1,0 +1,135 @@
+swagger: '2.0'
+info:
+  description: |
+    This is a sample task queue server.
+  version: "1.0.0"
+  title: task queue
+basePath: /api/v1
+schemes:
+- http
+paths:
+  /dump:
+    get:
+      summary: dump all tasks in queue
+      operationId: Dump
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                id: 
+                  type: string
+                  description: task id
+                value:
+                  type: string
+                  description: task value
+                  
+  /get:
+    get:
+      summary: get next task from queue
+      operationId: GetTask
+      parameters:
+      - in: query
+        name: client_id
+        type: string
+        required: true
+      - in: query
+        name: timeout
+        type: integer
+        required: true
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            properties:
+              id: 
+                type: string
+                description: task id
+              value:
+                type: string
+                description: task value
+
+        '204':
+          description: no task available
+          
+  /renew:
+    get:
+      summary: refresh lease on task
+      operationId: RenewTask
+      parameters: 
+      - in: query
+        name: client_id
+        type: string
+        required: true
+      - in: query
+        name: task_id
+        type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not found
+        '409':
+          description: Conflict
+          
+  /ack:
+    get:
+      summary: mark task as done
+      operationId: AckTask
+      parameters: 
+      - in: query
+        name: client_id
+        type: string
+        required: true
+      - in: query
+        name: task_id
+        type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not found
+          
+  /put:
+    get:
+      summary: add task to queue
+      operationId: PutTask
+      parameters: 
+      - in: query
+        name: data
+        type: string
+        required: true
+        description: user data assotiated with task (filename and so on)
+      - in: query
+        name: old
+        type: string
+        description: old state, used to add new task in CAS manner
+      - in: query
+        name: state
+        type: string
+        description: new state, add task only if `old` matches current state 
+      responses:
+        '200':
+          description: OK
+        '409': 
+          description: Conflict
+          
+  /state:
+    get:
+      summary: get task state cookie
+      operationId: GetState
+      responses:
+        '200':
+          description: OK
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                description: currect state
