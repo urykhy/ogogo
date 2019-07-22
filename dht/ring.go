@@ -69,12 +69,15 @@ func (d *dummyRingInstance) getID() uint64 {
 func (d *dummyRingInstance) dropNode(id uint64) {
 	delete(d.data, id)
 }
+func (d *dummyRingInstance) addNode(id uint64) {
+	d.data[id] = newDummyNode(id)
+}
 
 func newDummyRing(h hashFace, size int) *dummyRingInstance {
 	if size < replicaCount {
 		logger.Fatalf("ring size too small")
 	}
-	x := &dummyRingInstance{
+	d := &dummyRingInstance{
 		hasher: h,
 		data:   make(map[uint64]nodeFace),
 	}
@@ -82,7 +85,7 @@ func newDummyRing(h hashFace, size int) *dummyRingInstance {
 		id := rand.Uint64()
 		el := newDummyNode(id)
 		logger.Debugf("created instance %016x", id)
-		x.data[id] = el // FIXME: ensure uniq ids
+		d.data[id] = el // FIXME: ensure uniq ids
 	}
-	return x
+	return d
 }

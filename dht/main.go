@@ -37,6 +37,8 @@ func main() {
 	}
 	el.dropNode(0x78629a0f5f3f164f)
 	el.Replicate()
+	el.addNode(0x78629a0f5f3f164f)
+	el.Replicate()
 
 	logger.Info("finished")
 }

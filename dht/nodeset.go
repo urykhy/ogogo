@@ -23,3 +23,12 @@ func (d nodeSet) del(key string) {
 		n.del(key)
 	}
 }
+
+func (d nodeSet) contain(x nodeFace) bool {
+	for _, i := range d {
+		if i == x {
+			return true
+		}
+	}
+	return false
+}

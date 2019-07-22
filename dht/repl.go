@@ -14,6 +14,10 @@ func (d *dummyRingInstance) Replicate() {
 					logger.Debugf("replicate %s to %016x", k, n.getID())
 				}
 			}
+			if !ns.contain(v) {
+				logger.Debugf("drop excessive %s from %016x", k, v.getID())
+				v.del(k)
+			}
 		}
 	}
 }
