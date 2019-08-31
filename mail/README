@@ -1,0 +1,39 @@
+tiny mail server
+smtp + imap
+
+* relay via smarthost
+* virtual only domains
+* all mail for domain delivered to single user
+
+
+perl -MMIME::Base64 -e 'print encode_base64("\0username\0password")'
+
+telnet auth:
+AUTH PLAIN
+AHVzZXJuYW1lAHBhc3N3b3Jk
+
+todo:
+    +delivery to domain maildir
+    +relay with auth
+    +delivery to folders
+    +imap auth
+    drop smtp auth ?
+    imap / github.com/emersion/go-imap
+    add headers:
+Return-path: <ury@dark>
+Envelope-to: ury@dark
+Delivery-date: Tue, 27 Aug 2019 22:07:23 +0300
+Received: from ury by dark with local (mail-daemon)
+	id 1i2goN-0000We-Sv
+	for ury@dark; Tue, 27 Aug 2019 22:07:23 +0300
+Subject: Test Subject 2
+To: <ury@dark>
+X-Mailer: mail (GNU Mailutils 3.5)
+Message-Id: <E1i2goN-0000We-Sv@dark>
+From: Yury Stankevich <ury@dark>
+Date: Tue, 27 Aug 2019 22:07:23 +0300
+
+to be compat to sendmail from mailutils, process arguments
+-oi     -- Do not treat ‘.’ as message terminator.
+-f addr -- Use addr as the sender address.
+-t      -- Get recipient addresses from the message.

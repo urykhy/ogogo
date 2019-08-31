@@ -1,0 +1,26 @@
+main:
+  name: "elf.dark"
+  imap: "0.0.0.0:3143"
+  smtp: "0.0.0.0:3025"
+  log-level: "debug"
+  store: "/tmp/mailserver"  
+
+domains:  
+  - name: dark
+    aka: ["elf.dark","mail.elf.dark"]
+    username: "ury"
+    password: "ury"
+  - name: light
+    username: "lury"
+    password: "123"
+      
+relay:
+  - from: urykhy@gmail.com
+    via: smtp.gmail.com:25
+    username: "urykhy"
+    password: "asd"
+  - from: urykhy@yandex.ru
+    via: smtp.yandex.ru:25
+    username: "urykhy"
+    password: "asd"
+  
