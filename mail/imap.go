@@ -2,8 +2,10 @@ package main
 
 import (
 	"errors"
+	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -14,6 +16,28 @@ import (
 	"github.com/luksen/maildir"
 	"github.com/sirupsen/logrus"
 )
+
+// Body XXX
+type Body struct {
+	reader io.Reader
+	size   int
+}
+
+func newBody(reader io.Reader, size int) Body {
+	return Body{
+		reader: reader,
+		size:   size,
+	}
+}
+
+func (x Body) Read(p []byte) (n int, err error) {
+	return x.reader.Read(p)
+}
+
+// Len XXX
+func (x Body) Len() int {
+	return x.size
+}
 
 // IMAPMain xxx
 type IMAPMain struct{}
@@ -109,26 +133,34 @@ func (m *mailbox) Status(items []imap.StatusItem) (*imap.MailboxStatus, error) {
 	m.logger.Debug("Status")
 	status := imap.NewMailboxStatus(m.Name(), make([]imap.StatusItem, 0))
 
+	nkeys, err := m.md.Unseen()
+	if err != nil {
+		return nil, err
+	}
+	status.Unseen = uint32(len(nkeys))
+	m.logger.Debugf("found %v unseen message(s)", status.Unseen)
+	for _, i := range nkeys {
+		m.logger.Debugf("found new message: %v", i)
+	}
+
+	keys, err := m.md.Keys()
+	if err != nil {
+		return nil, err
+	}
+	status.Messages = uint32(len(keys)) + status.Unseen
+	m.logger.Debugf("found %v message(s)", status.Messages)
+	for _, i := range keys {
+		m.logger.Debugf("found message: %v", i)
+	}
+
 	for _, i := range items {
 		m.logger.Debug("run Status for ", i)
 		if i == imap.StatusMessages {
 			status.Items[i] = struct{}{}
-			keys, err := m.md.Keys()
-			if err != nil {
-				return nil, err
-			}
-			status.Messages = uint32(len(keys))
-			m.logger.Debugf("found %v messages", status.Messages)
 		}
-		if i == imap.StatusUnseen {
+		/*if i == imap.StatusUnseen {
 			status.Items[i] = struct{}{}
-			count, err := m.md.UnseenCount()
-			if err != nil {
-				return nil, err
-			}
-			status.Unseen = uint32(count)
-			m.logger.Debugf("found %v unseen messages", status.Unseen)
-		}
+		}*/
 	}
 	return status, nil
 }
@@ -140,9 +172,105 @@ func (m *mailbox) Check() error {
 	m.logger.Debug("Check")
 	return errors.New("not supported / Check")
 }
+func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Message, error) {
+	m.logger.Debugf("exporting message %v", key)
+	message, err := m.md.Message(key)
+	if err != nil {
+		return nil, err
+	}
+	m.logger.Debugf("headers: %v", message.Header)
+
+	xm := imap.NewMessage(uint32(1), items)
+	xm.BodyStructure = &imap.BodyStructure{
+		MIMEType:    "message",
+		MIMESubType: "rfc822",
+		//Size:        42,
+		/*Envelope: &imap.Envelope{
+			Subject:   "test envelope",
+			MessageId: i,
+		},*/
+	}
+
+	/*nm.Items[imap.FetchBody] = messageBody
+	nm.Body[&imap.BodySectionName{
+		BodyPartName: imap.BodyPartName{
+			Specifier: imap.PartSpecifier(imap.FetchBody)}}] = newBody(messageBody)*/
+
+	for _, item := range items {
+		m.logger.Debug("export item: ", item)
+		switch item {
+		case imap.FetchRFC822Size:
+			filename, err := m.md.Filename(key)
+			if err != nil {
+				return nil, err
+			}
+			st, err := os.Stat(filename)
+			if err != nil {
+				return nil, err
+			}
+			xm.Size = uint32(st.Size())
+		case imap.FetchUid:
+			xm.Uid = 1
+		case imap.FetchFlags:
+			flags, err := m.md.Flags(key)
+			if err != nil {
+				return nil, err
+			}
+			m.logger.Debug("found flags ", flags)
+			// xm.Flags = FIXME
+		//case imap.FetchBody, imap.FetchBodyStructure:
+		default:
+			m.logger.Debug("default for item ", item)
+			section, err := imap.ParseBodySectionName(item)
+			if err != nil {
+				break
+			}
+			m.logger.Debug("section: ", section)
+
+			filename, err := m.md.Filename(key)
+			if err != nil {
+				return nil, err
+			}
+			st, err := os.Stat(filename)
+			if err != nil {
+				return nil, err
+			}
+			messageData, err := os.Open(filename)
+			if err != nil {
+				return nil, err
+			}
+			xm.Body[section] = newBody(messageData, int(st.Size()))
+		}
+	}
+
+	return xm, nil
+}
+
 func (m *mailbox) ListMessages(uid bool, seqset *imap.SeqSet, items []imap.FetchItem, ch chan<- *imap.Message) error {
-	m.logger.Debug("ListMessages")
-	return errors.New("not supported / ListMessages")
+	defer close(ch)
+	m.logger.Debugf("ListMessages: uid: %v", uid)
+	for _, i := range items {
+		m.logger.Debugf("ListMessages: item %v", i)
+	}
+	for _, i := range seqset.Set {
+		m.logger.Debugf("ListMessages: seq %v", i)
+	}
+	keys, err := m.md.Keys()
+	if err != nil {
+		return err
+	}
+
+	for _, key := range keys {
+		xm, err := m.exportMessage(key, items)
+		if err != nil {
+			m.logger.Warnf("ListMessages: fail to export %v: %v", key, err)
+			return err
+		}
+		ch <- xm
+	}
+
+	return nil
+	//return errors.New("not supported / ListMessages")
 }
 func (m *mailbox) SearchMessages(uid bool, criteria *imap.SearchCriteria) ([]uint32, error) {
 	m.logger.Debug("SearchMessages")

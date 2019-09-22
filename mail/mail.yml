@@ -3,7 +3,7 @@ main:
   imap: "0.0.0.0:3143"
   smtp: "0.0.0.0:3025"
   log-level: "debug"
-  store: "/tmp/mailserver"  
+  store: "/home/ury/tmp/maildir"  
 
 domains:  
   - name: dark
