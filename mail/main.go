@@ -17,6 +17,7 @@ type mainConfig struct {
 	SMTPAddr string `yaml:"smtp"`
 	LogLevel string `yaml:"log-level"`
 	Store    string `yaml:"store"`
+	DB       string `yaml:"db"`
 }
 
 type relayConfig struct {

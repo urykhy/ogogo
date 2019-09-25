@@ -4,6 +4,7 @@ main:
   smtp: "0.0.0.0:3025"
   log-level: "debug"
   store: "/home/ury/tmp/maildir"  
+  db: "/home/ury/tmp/maildir.uid"
 
 domains:  
   - name: dark

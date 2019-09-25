@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -10,12 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/backend"
 	"github.com/emersion/go-imap/server"
 	"github.com/luksen/maildir"
 	"github.com/sirupsen/logrus"
 )
+
+var globalUIDManager *uidManager
 
 // Body XXX
 type Body struct {
@@ -184,17 +187,7 @@ func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Messa
 	xm.BodyStructure = &imap.BodyStructure{
 		MIMEType:    "message",
 		MIMESubType: "rfc822",
-		//Size:        42,
-		/*Envelope: &imap.Envelope{
-			Subject:   "test envelope",
-			MessageId: i,
-		},*/
 	}
-
-	/*nm.Items[imap.FetchBody] = messageBody
-	nm.Body[&imap.BodySectionName{
-		BodyPartName: imap.BodyPartName{
-			Specifier: imap.PartSpecifier(imap.FetchBody)}}] = newBody(messageBody)*/
 
 	for _, item := range items {
 		m.logger.Debug("export item: ", item)
@@ -210,7 +203,10 @@ func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Messa
 			}
 			xm.Size = uint32(st.Size())
 		case imap.FetchUid:
-			xm.Uid = 1
+			xm.Uid, err = globalUIDManager.Get(key)
+			if err != nil {
+				return nil, errors.Wrap(err, "fail to get UID")
+			}
 		case imap.FetchFlags:
 			flags, err := m.md.Flags(key)
 			if err != nil {
@@ -291,6 +287,11 @@ func (m *mailbox) Expunge() error {
 
 // IMAPRun xxx
 func IMAPRun(addr string) {
+	uidM, err := createUIDManager(cfg.Main.DB)
+	if err != nil {
+		log.Fatal(err)
+	}
+	globalUIDManager = uidM
 	s := server.New(&IMAPMain{})
 	s.Addr = addr
 	s.AllowInsecureAuth = true
