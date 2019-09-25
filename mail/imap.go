@@ -155,10 +155,21 @@ func (m *mailbox) Status(items []imap.StatusItem) (*imap.MailboxStatus, error) {
 	for _, i := range keys {
 		m.logger.Debugf("found message: %v", i)
 	}
+	status.UidValidity = 1
+	status.UidNext, err = globalUIDManager.Next()
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to predict next uid")
+	}
 
 	for _, i := range items {
 		m.logger.Debug("run Status for ", i)
 		if i == imap.StatusMessages {
+			status.Items[i] = struct{}{}
+		}
+		if i == imap.StatusUidValidity {
+			status.Items[i] = struct{}{}
+		}
+		if i == imap.StatusUidNext {
 			status.Items[i] = struct{}{}
 		}
 		/*if i == imap.StatusUnseen {

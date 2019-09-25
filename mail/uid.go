@@ -89,3 +89,27 @@ func (u *uidManager) Get(id string) (uint32, error) {
 
 	return uint32(uid), nil
 }
+
+func (u *uidManager) Next() (uint32, error) {
+	fetchStmt, err := u.db.Prepare("SELECT MAX(id) FROM uids")
+	if err != nil {
+		return 0, err
+	}
+	defer fetchStmt.Close()
+	rows, err := fetchStmt.Query()
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var next uint32
+		err = rows.Scan(&next)
+		if err != nil {
+			return 0, err
+		}
+		next++
+		u.logger.Debug("predict next uid as ", next)
+		return next, nil
+	}
+	return 0, nil
+}
