@@ -19,7 +19,7 @@ func (s *SMTPMain) Login(state *smtp.ConnectionState, username, password string)
 	if username != "username" || password != "password" {
 		return nil, errors.New("Invalid username or password")
 	}
-	logger.Debugf("Login %s from %v", username, state.RemoteAddr)
+	logger.Infof("Login %s from %v", username, state.RemoteAddr)
 	return &Session{logger: logger.WithFields(logrus.Fields{
 		"remote": state.RemoteAddr.String(),
 		"auth":   username})}, nil
@@ -27,7 +27,7 @@ func (s *SMTPMain) Login(state *smtp.ConnectionState, username, password string)
 
 // AnonymousLogin requires clients to authenticate using SMTP AUTH before sending emails
 func (s *SMTPMain) AnonymousLogin(state *smtp.ConnectionState) (smtp.Session, error) {
-	logger.Debugf("Anonymous login from %v", state.RemoteAddr)
+	logger.Infof("Anonymous login from %v", state.RemoteAddr)
 	return &Session{logger: logger.WithFields(logrus.Fields{
 		"remote": state.RemoteAddr.String(),
 		"auth":   "anonymous"}),
@@ -70,6 +70,7 @@ func (s *Session) Data(r io.Reader) error {
 	}
 	s.logger.Debugf("Data: %s", string(b))
 
+	s.logger.Infof("Delivery from %v to %v", s.Message.from, s.Message.to)
 	err = delivery(s.Message, b, s.remote)
 	if err != nil {
 		s.logger.Errorf("Delivery failed: %s", err)

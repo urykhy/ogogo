@@ -61,7 +61,7 @@ func (x *IMAPMain) Login(state *imap.ConnInfo, login, password string) (backend.
 	if username != ld.Username || password != ld.Password {
 		return nil, errors.New("Invalid username or password")
 	}
-	logger.Debugf("Login %s from %v", username, state.RemoteAddr)
+	logger.Infof("Login %s from %v", username, state.RemoteAddr)
 
 	return &user{name: username,
 		path: path.Join(cfg.Main.Store, ld.Name),
@@ -99,7 +99,7 @@ func (u *user) ListMailboxes(subscribed bool) ([]backend.Mailbox, error) {
 }
 func (u *user) GetMailbox(name string) (backend.Mailbox, error) {
 	// FIXME: check if folder exists
-	u.logger.Debugf("get mailbox %s(%s)", name, path.Join(u.path, name))
+	u.logger.Infof("open mailbox %s(%s)", name, path.Join(u.path, name))
 	return &mailbox{
 		name:   name,
 		md:     maildir.Dir(path.Join(u.path, name)),
