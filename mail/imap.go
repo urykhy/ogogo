@@ -172,9 +172,9 @@ func (m *mailbox) Status(items []imap.StatusItem) (*imap.MailboxStatus, error) {
 		if i == imap.StatusUidNext {
 			status.Items[i] = struct{}{}
 		}
-		/*if i == imap.StatusUnseen {
+		if i == imap.StatusUnseen {
 			status.Items[i] = struct{}{}
-		}*/
+		}
 	}
 	return status, nil
 }
@@ -261,6 +261,19 @@ func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Messa
 	return xm, nil
 }
 
+func (m *mailbox) isMatch(key string, seqset *imap.SeqSet) (bool, error) {
+	uid, err := globalUIDManager.Get(key)
+	if err != nil {
+		return false, errors.Wrap(err, "fail to get UID")
+	}
+	for _, i := range seqset.Set {
+		if i.Contains(uid) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (m *mailbox) ListMessages(uid bool, seqset *imap.SeqSet, items []imap.FetchItem, ch chan<- *imap.Message) error {
 	defer close(ch)
 	m.logger.Debugf("ListMessages: uid: %v", uid)
@@ -276,6 +289,14 @@ func (m *mailbox) ListMessages(uid bool, seqset *imap.SeqSet, items []imap.Fetch
 	}
 
 	for _, key := range keys {
+		matched, err := m.isMatch(key, seqset)
+		if err != nil {
+			m.logger.Warnf("ListMessages: fail to export %v: %v", key, err)
+			return err
+		}
+		if !matched {
+			continue
+		}
 		xm, err := m.exportMessage(key, items)
 		if err != nil {
 			m.logger.Warnf("ListMessages: fail to export %v: %v", key, err)
