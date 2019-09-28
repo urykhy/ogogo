@@ -190,9 +190,13 @@ func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Messa
 	logger := m.logger.WithField("message", key)
 
 	logger.Debugf("exporting")
-	var err error
 
-	xm := imap.NewMessage(uint32(1), items)
+	uid, err := globalUIDManager.Get(key)
+	if err != nil {
+		return nil, errors.Wrap(err, "fail to get UID")
+	}
+
+	xm := imap.NewMessage(uid, items)
 	xm.BodyStructure = &imap.BodyStructure{
 		MIMEType:    "message",
 		MIMESubType: "rfc822",
@@ -212,10 +216,7 @@ func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Messa
 			}
 			xm.Size = uint32(st.Size())
 		case imap.FetchUid:
-			xm.Uid, err = globalUIDManager.Get(key)
-			if err != nil {
-				return nil, errors.Wrap(err, "fail to get UID")
-			}
+			xm.Uid = uid
 		case imap.FetchFlags:
 			flags, err := m.md.Flags(key)
 			if err != nil {

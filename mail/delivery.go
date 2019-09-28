@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/mail"
+	"time"
 
 	"path"
 	"strings"
@@ -10,20 +11,38 @@ import (
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/luksen/maildir"
+	"github.com/pkg/errors"
 )
 
-func delivery(msg Meta, data []byte) error {
-	e, err := mail.ParseAddress(msg.to)
+func formatTime() string {
+	return time.Now().Format("Mon, 2 Jan 2006 15:04:05 -0700")
+}
+
+func splitAddr(addr string) (string, string, error) {
+	e, err := mail.ParseAddress(addr)
 	if err != nil {
-		return fmt.Errorf("bad rcpt: %s", msg.to)
+		return "", "", err
 	}
 	split := strings.Split(e.Address, "@")
 	if len(split) != 2 {
-		return fmt.Errorf("bad rcpt: %s", msg.to)
+		return "", "", errors.New("fail to parse")
 	}
-	rcptName, rcptDomain := split[0], split[1]
+	return split[0], split[1], nil
+}
+
+func delivery(msg Meta, data []byte, remote string) error {
+	rcptName, rcptDomain, err := splitAddr(msg.to)
+	if err != nil {
+		return errors.Wrapf(err, "bad rcpt: %s", msg.to)
+	}
+
+	header := "Received: from " + msg.from + " (" + remote + ") by " + cfg.Main.Name + " for " + msg.to + "; " + formatTime() + "\n"
+	data = append([]byte(header), data...)
 
 	if ld := findLocalDomain(rcptDomain); ld != nil {
+		header := "Return-path: <" + msg.from + ">\n" +
+			"Delivery-date: " + formatTime() + "\n"
+		data = append([]byte(header), data...)
 		return localDelivery(ld, rcptName, data)
 	}
 	if sd := findSmartHost(msg.from); sd != nil {

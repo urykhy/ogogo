@@ -30,7 +30,8 @@ func (s *SMTPMain) AnonymousLogin(state *smtp.ConnectionState) (smtp.Session, er
 	logger.Debugf("Anonymous login from %v", state.RemoteAddr)
 	return &Session{logger: logger.WithFields(logrus.Fields{
 		"remote": state.RemoteAddr.String(),
-		"auth":   "anonymous"})}, nil
+		"auth":   "anonymous"}),
+		remote: state.RemoteAddr.String()}, nil
 	//return nil, smtp.ErrAuthRequired
 }
 
@@ -44,6 +45,7 @@ type Meta struct {
 type Session struct {
 	Message Meta
 	logger  *logrus.Entry
+	remote  string
 }
 
 // Mail xxx
@@ -68,7 +70,7 @@ func (s *Session) Data(r io.Reader) error {
 	}
 	s.logger.Debugf("Data: %s", string(b))
 
-	err = delivery(s.Message, b)
+	err = delivery(s.Message, b, s.remote)
 	if err != nil {
 		s.logger.Errorf("Delivery failed: %s", err)
 		return err
