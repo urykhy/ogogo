@@ -187,12 +187,10 @@ func (m *mailbox) Check() error {
 	return errors.New("not supported / Check")
 }
 func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Message, error) {
-	m.logger.Debugf("exporting message %v", key)
-	message, err := m.md.Message(key)
-	if err != nil {
-		return nil, err
-	}
-	m.logger.Debugf("headers: %v", message.Header)
+	logger := m.logger.WithField("message", key)
+
+	logger.Debugf("exporting")
+	var err error
 
 	xm := imap.NewMessage(uint32(1), items)
 	xm.BodyStructure = &imap.BodyStructure{
@@ -201,7 +199,7 @@ func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Messa
 	}
 
 	for _, item := range items {
-		m.logger.Debug("export item: ", item)
+		logger.Debug("export item: ", item)
 		switch item {
 		case imap.FetchRFC822Size:
 			filename, err := m.md.Filename(key)
@@ -223,16 +221,22 @@ func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Messa
 			if err != nil {
 				return nil, err
 			}
-			m.logger.Debug("found flags ", flags)
-			// xm.Flags = FIXME
+			logger.Debug("found flags: ", flags)
+			for _, flag := range flags {
+				switch flag {
+				case 'S':
+					xm.Flags = append(xm.Flags, imap.SeenFlag)
+				}
+			}
+			//  = FIXME
 		//case imap.FetchBody, imap.FetchBodyStructure:
 		default:
-			m.logger.Debug("default for item ", item)
+			logger.Debug("export body")
 			section, err := imap.ParseBodySectionName(item)
 			if err != nil {
 				break
 			}
-			m.logger.Debug("section: ", section)
+			//logger.Debug("section: ", section)
 
 			filename, err := m.md.Filename(key)
 			if err != nil {
@@ -247,6 +251,10 @@ func (m *mailbox) exportMessage(key string, items []imap.FetchItem) (*imap.Messa
 				return nil, err
 			}
 			xm.Body[section] = newBody(messageData, int(st.Size()))
+			err = m.md.SetFlags(key, "S")
+			if err != nil {
+				logger.Warn("fail to set seen status")
+			}
 		}
 	}
 
