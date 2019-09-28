@@ -111,5 +111,5 @@ func (u *uidManager) Next() (uint32, error) {
 		u.logger.Debug("predict next uid as ", next)
 		return next, nil
 	}
-	return 0, nil
+	return 1, nil
 }
