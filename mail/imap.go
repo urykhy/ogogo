@@ -278,6 +278,9 @@ func (m *mailbox) isMatch(key string, seqset *imap.SeqSet) (bool, error) {
 func (m *mailbox) ListMessages(uid bool, seqset *imap.SeqSet, items []imap.FetchItem, ch chan<- *imap.Message) error {
 	defer close(ch)
 	m.logger.Debugf("ListMessages: uid: %v", uid)
+	if !uid {
+		return errors.New("ListMessages: only UID mode is supported")
+	}
 	for _, i := range items {
 		m.logger.Debugf("ListMessages: item %v", i)
 	}
