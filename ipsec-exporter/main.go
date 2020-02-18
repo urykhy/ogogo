@@ -18,6 +18,7 @@ import (
 	"github.com/VictoriaMetrics/metrics"
 	"github.com/jasonlvhit/gocron"
 	log "github.com/sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var (
@@ -28,8 +29,8 @@ var (
 )
 
 func updateMetrics() {
-	defer logger.Info("update done")
-	logger.Info("update started...")
+	defer logger.Debug("update done")
+	logger.Debug("update started...")
 
 	cmd := exec.Command("ip", "-s", "xfrm", "state")
 	stream, _ := cmd.StdoutPipe()
@@ -65,7 +66,19 @@ func updateMetrics() {
 
 func main() {
 	listenAddress := flag.String("web.listen-address", ":9168", "Address to listen on for web interface")
+	logLevel := flag.String("log.level", "debug", "Sets the loglevel. Valid levels are debug, info")
+	logFormat := flag.String("log.format", "json", "Sets the log format. Valid formats are json and text")
 	flag.Parse()
+
+	level, err := log.ParseLevel(*logLevel)
+	if err != nil {
+		log.Fatalf("bad log level: %v", err)
+	}
+	logger.Level = level
+
+	if *logFormat == "text" {
+		logger.Formatter = &prefixed.TextFormatter{TimestampFormat: "2006-01-02 15:04:05", FullTimestamp: true}
+	}
 
 	logger.Info("ipsec exporter starting on ", *listenAddress)
 	done := make(chan os.Signal, 1)
