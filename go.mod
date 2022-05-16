@@ -3,6 +3,7 @@ module ogogo.com
 go 1.15
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.3.3
 	github.com/VictoriaMetrics/metrics v1.12.3
 	github.com/coreos/etcd v3.3.25+incompatible // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -11,7 +12,7 @@ require (
 	github.com/emersion/go-imap v1.0.6
 	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21
 	github.com/emersion/go-smtp v0.14.0
-	github.com/envoyproxy/go-control-plane v0.9.4 // indirect
+	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gocraft/dbr v0.0.0-20190714181702-8114670a83bd
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/protobuf v1.4.1 // indirect
@@ -33,5 +34,5 @@ require (
 	google.golang.org/grpc v1.26.0 // indirect
 	google.golang.org/protobuf v1.23.0 // indirect
 	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0
-	gopkg.in/yaml.v2 v2.2.2
+	gopkg.in/yaml.v2 v2.2.8
 )
