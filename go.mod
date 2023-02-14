@@ -11,9 +11,7 @@ require (
 	github.com/emersion/go-imap v1.0.6
 	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21
 	github.com/emersion/go-smtp v0.14.0
-	github.com/envoyproxy/go-control-plane v0.9.4 // indirect
-	github.com/gocraft/dbr v0.0.0-20190714181702-8114670a83bd
-	github.com/gogo/protobuf v1.3.1 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.4.1 // indirect
 	github.com/google/go-cmp v0.5.0 // indirect
 	github.com/google/uuid v1.1.2 // indirect
